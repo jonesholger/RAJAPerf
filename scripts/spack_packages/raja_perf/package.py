@@ -82,10 +82,12 @@ class RajaPerf(CMakePackage, CudaPackage):
     variant('hip', default=False, description='Build with HIP support')
     variant('tests', default='basic', values=('none', 'basic', 'benchmarks'),
             multi=False, description='Tests to run')
+    variant('caliper',default=False, description='Build with support for Caliper based profiling')
 
     depends_on('cmake@3.8:', type='build')
     depends_on('cmake@3.9:', when='+cuda', type='build')
     depends_on('hip', when='+hip')
+    depends_on('caliper@2.7.0 ~mpi ^adiak ~mpi',when='+caliper')
 
     conflicts('+openmp', when='+hip')
     conflicts('~openmp', when='+openmp_target', msg='OpenMP target requires OpenMP')
@@ -352,6 +354,12 @@ class RajaPerf(CMakePackage, CudaPackage):
         else:
             cfg.write(cmake_cache_option("ENABLE_BENCHMARKS", 'tests=benchmarks' in spec))
             cfg.write(cmake_cache_option("ENABLE_TESTS", not 'tests=none' in spec or self.run_tests))
+
+        if "+caliper" in spec:
+            cfg.write(cmake_cache_option("ENABLE_CALIPER",True))
+        else:
+            cfg.write(cmake_cache_option("ENABLE_CALIPER",False))
+
 
         #######################
         # Close and save
