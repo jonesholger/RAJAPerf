@@ -87,7 +87,8 @@ class RajaPerf(CMakePackage, CudaPackage):
     depends_on('cmake@3.8:', type='build')
     depends_on('cmake@3.9:', when='+cuda', type='build')
     depends_on('hip', when='+hip')
-    depends_on('caliper@2.7.0 ~mpi ^adiak ~mpi',when='+caliper')
+    depends_on('caliper@2.7.0 ~mpi',when='+caliper')
+    depends_on('adiak@0.2.1 ~mpi',when='+caliper')
 
     conflicts('+openmp', when='+hip')
     conflicts('~openmp', when='+openmp_target', msg='OpenMP target requires OpenMP')
@@ -357,6 +358,14 @@ class RajaPerf(CMakePackage, CudaPackage):
 
         if "+caliper" in spec:
             cfg.write(cmake_cache_option("ENABLE_CALIPER",True))
+            path_replacements = {}
+            caliper_dir = get_spec_path(spec, "caliper", path_replacements)
+            caliper_dir += "/share/cmake/caliper"
+            cfg.write(cmake_cache_entry("caliper_DIR",caliper_dir,"Cmake prefix path for Caliper Install"))
+            adiak_dir = get_spec_path(spec, "adiak", path_replacements)
+            adiak_dir += "/lib/cmake/adiak"
+            cfg.write(cmake_cache_entry("adiak_DIR",adiak_dir,"Cmake prefix path for Adiak Install"))
+            
         else:
             cfg.write(cmake_cache_option("ENABLE_CALIPER",False))
 

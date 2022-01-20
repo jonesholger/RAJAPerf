@@ -95,6 +95,8 @@ fi
 
 build_dir="${build_root}/build_${hostconfig//.cmake/}"
 
+cmake_exe=`grep 'CMake executable' ${hostconfig_path} | cut -d ':' -f 2 | xargs`
+
 # Build
 if [[ "${option}" != "--deps-only" && "${option}" != "--test-only" ]]
 then
@@ -110,7 +112,19 @@ then
     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
 
     # Map CPU core allocations
-    declare -A core_counts=(["lassen"]=40 ["ruby"]=28 ["corona"]=32)
+    #declare -A core_counts=(["lassen"]=40 ["ruby"]=28 ["corona"]=32)
+
+    logicalCpuCount=$([ $(uname) = 'Darwin' ] && 
+                       sysctl -n hw.logicalcpu_max || 
+                       lscpu -p | egrep -v '^#' | wc -l)
+
+    
+    physicalCpuCount=$([ $(uname) = 'Darwin' ] && 
+                       sysctl -n hw.physicalcpu_max ||
+                       lscpu -p | egrep -v '^#' | sort -u -t, -k 2,4 | wc -l)
+
+    core_counts="$((physicalCpuCount-physicalCpuCount/10))"
+
 
     # If using Multi-project, set up the submodule
     if [[ -n ${raja_version} ]]
@@ -135,21 +149,27 @@ then
     mkdir -p ${build_dir} && cd ${build_dir}
 
     date
-    cmake \
+    $cmake_exe \
       -C ${hostconfig_path} \
       ${project_dir}
-    if echo ${spec} | grep -q "intel" ; then
-        cmake --build . -j 16
-        echo "~~~~~~~~~ Build Command: ~~~~~~~~~~~~~~~~~~~~~"
-        echo "cmake --build . -j 16"
-        echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    else
-        cmake --build . -j ${core_counts[$truehostname]}
-        echo "~~~~~~~~~ Build Command: ~~~~~~~~~~~~~~~~~~~~~"
-        echo "cmake --build . -j ${core_counts[$truehostname]}"
-        echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-    fi
-    date
+#    if echo ${spec} | grep -q "intel" ; then
+#        $cmake_exe --build . -j 16
+#        echo "~~~~~~~~~ Build Command: ~~~~~~~~~~~~~~~~~~~~~"
+#        echo "cmake --build . -j 16"
+#        echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+#    else
+#        $cmake_exe --build . -j ${core_counts[$truehostname]}
+#        echo "~~~~~~~~~ Build Command: ~~~~~~~~~~~~~~~~~~~~~"
+#       echo "cmake --build . -j ${core_counts[$truehostname]}"
+#        echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+#    fi
+#    
+     $cmake_exe --build . -j $core_counts
+     echo "~~~~~~~~~ Build Command: ~~~~~~~~~~~~~~~~~~~~~"
+     echo "cmake --build . -j " $core_counts
+     echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+     date
+
 fi
 
 echo "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
