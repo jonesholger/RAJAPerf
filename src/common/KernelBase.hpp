@@ -529,14 +529,15 @@ public:
       std::cout << "Caliper ran Spot config check\n";
     }
 
-    if(config_ok) {
+    if(config_ok && mgr.size() == 0) {
       cali::ConfigManager m;
       mgr.insert(std::make_pair(vid, m));
       std::string od("./");
       if (outdir.size()) {
         od = outdir + "/";
       }
-      std::string vstr = getVariantName(vid);
+      //std::string vstr = getVariantName(vid);
+      std::string vstr = "RAJAPerf";
       std::string profile = "spot(output=" + od + vstr + ".cali)";
       if(!addToConfig.empty()) {
         profile += "," + addToConfig;
@@ -558,14 +559,21 @@ public:
     }
   }
 
-  static void setCaliperMgrStart(VariantID vid) { mgr[vid].start(); }
-  static void setCaliperMgrStop(VariantID vid) { mgr[vid].stop(); }
+  static void setCaliperMgrStart(VariantID /*vid*/) {
+    VariantID lvid = mgr.begin()->first;
+    mgr[lvid].start();
+  }
+  static void setCaliperMgrStop(VariantID /*vid*/) {
+    VariantID lvid = mgr.begin()->first;
+    mgr[lvid].stop();
+  }
   static void setCaliperMgrFlush() 
   { // we're going to flush all the variants at once
     std::cout << "flushing " << mgr.size() << " variants\n";
     for(auto const &kv : mgr) {
       // set Adiak key first
-      std::string variant=getVariantName(kv.first);
+      //std::string variant=getVariantName(kv.first);
+      std::string variant="RAJAPerf";
       adiak::value("variant",variant.c_str());
       mgr[kv.first].flush(); 
     }
