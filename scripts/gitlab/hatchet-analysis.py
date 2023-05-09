@@ -3,12 +3,13 @@
 import sys
 import platform
 import datetime as dt
-
+import pkgutil
 import argparse
 
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument('-r','--report',required=True,nargs=1,help="Pass the Caliper report file.")
-parser.add_argument('-b','--baseline',required=True,nargs=1,help="Pass the Caliper baseline file.")
+parser.add_argument('-f','--file',required=True,nargs=1,help="Pass the Caliper file.")
+parser.add_argument('-r','--report',required=True,nargs=1,help="Pass the report variant name.")
+parser.add_argument('-b','--baseline',required=True,nargs=1,help="Pass the baseline variant name.")
 parser.add_argument('-t','--tolerance',required=False,nargs=1,type=float,default=[0.05],help="Specify tolerance for pass/fail")
 
 args = parser.parse_args()
@@ -95,23 +96,63 @@ def ExtractCommonSubtree(gf1: ht.GraphFrame, gf2: ht.GraphFrame, metric: str) ->
             common_subtree.dataframe.loc[nn, metric] = s0
 
       return common_subtree
+   
+def setup_filter(variant_str, roots ):
+   variants = []
+   for idx, x in enumerate(roots):
+      variants.append(roots[idx].frame['name'])
+   print(variants)
+   try:
+      variant_root_index = variants.index(variant_str)
+      print("variant_root_index=" + str(variant_root_index))
+   except:
+      print("cannot find variant: " + variant_str )
+      return None
+   
+   def filter(x):
+      # x.values[0] is first column in pandas series aka node
+      # call paths on node to get list of tuples up tree
+      # first tuple is root, extract 1st element out of tuple to compare
+      v = x.values[0].paths()[0][0] == roots[variant_root_index].paths()[0][0]
+      return v
+   return filter
 
-f1 = args.report[0]
-f2 = args.baseline[0]
+def extract_tree(variant_str, graphframe):
+   cc = graphframe.deepcopy()
+   subtree = None
+   try:
+      filter_func = setup_filter(variant_str, graphframe.graph.roots)
+      subtree = cc.filter(filter_func, squash=True)
+   except:
+      print("Cannot Extract Subtree .. check arguments")
+   return subtree
+   
+filename = args.file[0]
+report_variant = args.report[0]
+baseline_variant = args.baseline[0]
 tolerance=args.tolerance[0]
 
+gf = ht.GraphFrame.from_caliperreader(filename)
+report_tree = extract_tree(report_variant,gf)
+baseline_tree = extract_tree(baseline_variant,gf)
 
-gf1 = GenericFrame(ht.GraphFrame.from_caliperreader(f1))
-gf2 = GenericFrame(ht.GraphFrame.from_caliperreader(f2))
-
-if 'min#inclusive#sum#time.duration' in gf1.inc_metrics:
+if 'min#inclusive#sum#time.duration' in gf.inc_metrics:
   metric = 'min#inclusive#sum#time.duration' 
-elif 'Min time/rank' in gf1.inc_metrics:
-  metric = 'Min time/rank' 
+elif 'Min time/rank' in gf.inc_metrics:
+  metric = 'Min time/rank'
+  
+print(metric)
+
+print("full tree")
+print(gf.tree(metric_column=metric,precision=5))
+
+print(report_tree.tree(metric_column=metric,precision=5))
+print(baseline_tree.tree(metric_column=metric,precision=5))
+gf1 = GenericFrame(report_tree)
+gf2 = GenericFrame(baseline_tree)
 
 gf11 = gf1
 gf22 = gf2
-
 if len(gf1.graph) != len(gf2.graph):
    gf11 = ExtractCommonSubtree(gf1,gf2,metric)
    gf22 = ExtractCommonSubtree(gf2,gf1,metric)
@@ -125,12 +166,11 @@ gf3 = gf11 - gf22
 #print(sorted_df.head())
 
 # Display calltree
-#print(gf3.tree(metric_column=metric,precision=5))
+print(gf3.tree(metric_column=metric,precision=5))
 
 #setup threshold as a fraction of baseline using tolerance multiplier
-baseline_node = gf2.graph.roots[0]
-threshold = tolerance * float(gf2.dataframe.loc[baseline_node, metric])
-
+baseline_node = baseline_tree.graph.roots[0]
+threshold = tolerance * float(baseline_tree.dataframe.loc[baseline_node, metric])
 
 # Get a single metric value for a given node
 root_node = gf3.graph.roots[0]
